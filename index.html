@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>TapSwap WebApp</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --primary-bg: #1a1a2e;
+            --secondary-bg: #16213e;
+            --accent-color: #0f3460;
+            --text-color: #e94560;
+            --highlight-color: #f9ed69;
+            --button-bg: #533483;
+            --button-text: #ffffff;
+            --white: #ffffff;
+            --grey: #cccccc;
+            --energy-bar-bg: #333;
+            --energy-bar-fill: #4CAF50;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--primary-bg);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .app-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 20px;
+            padding-bottom: 70px; /* Space for nav bar */
+        }
+
+        .page {
+            display: none;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Navigation Bar */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background-color: var(--secondary-bg);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
+            padding: 5px 0;
+            z-index: 1000;
+        }
+
+        .nav-button {
+            background-color: transparent;
+            border: none;
+            color: var(--grey);
+            padding: 10px 5px;
+            cursor: pointer;
+            font-size: 10px;
+            text-align: center;
+            flex-grow: 1;
+            transition: color 0.2s, background-color 0.2s;
+        }
+        .nav-button svg {
+            display: block;
+            margin: 0 auto 4px auto;
+            width: 24px;
+            height: 24px;
+            fill: currentColor;
+        }
+
+        .nav-button.active {
+            color: var(--highlight-color);
+            background-color: var(--accent-color);
+            border-radius: 8px;
+        }
+
+        /* Common Styles */
+        h1, h2 {
+            color: var(--highlight-color);
+            text-align: center;
+        }
+
+        p {
+            line-height: 1.6;
+        }
+
+        .card {
+            background-color: var(--secondary-bg);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .button {
+            background-color: var(--button-bg);
+            color: var(--button-text);
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            display: block;
+            width: 100%;
+            margin-top: 10px;
+            transition: background-color 0.2s;
+        }
+
+        .button:hover {
+            background-color: #6f42c1; /* Darker shade of button-bg */
+        }
+        .button:disabled {
+            background-color: var(--grey);
+            cursor: not-allowed;
+        }
+
+        input[type="number"], select {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            border: 1px solid var(--accent-color);
+            background-color: var(--primary-bg);
+            color: var(--text-color);
+        }
+
+        /* Tap Section */
+        #tap-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            height: 100%; /* Ensure it takes full height of its container */
+        }
+
+        #cat-image {
+            width: 150px;
+            height: 150px;
+            background-color: var(--highlight-color); /* Placeholder for cat image */
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 50px;
+            cursor: pointer;
+            user-select: none; /* Prevent text selection on rapid clicks */
+            transition: transform 0.1s ease;
+            border: 5px solid var(--accent-color);
+            margin-bottom: 20px;
+        }
+         #cat-image:active {
+            transform: scale(0.95);
+        }
+
+        .points-display {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: var(--highlight-color);
+        }
+
+        .energy-bar-container {
+            width: 80%;
+            max-width: 300px;
+            height: 25px;
+            background-color: var(--energy-bar-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 15px;
+            border: 2px solid var(--accent-color);
+        }
+
+        #energy-bar-fill {
+            height: 100%;
+            width: 100%; /* Initial width */
+            background-color: var(--energy-bar-fill);
+            border-radius: 10px 0 0 10px; /* Smooth edge only on the left */
+            transition: width 0.2s ease-out;
+            text-align: center;
+            line-height: 25px;
+            color: var(--white);
+            font-size: 12px;
+        }
+        
+        .floating-text {
+            position: absolute;
+            font-size: 20px;
+            color: var(--highlight-color);
+            opacity: 1;
+            animation: floatUp 1s ease-out forwards;
+            pointer-events: none; /* So it doesn't interfere with cat clicks */
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-50px); opacity: 0; }
+        }
+
+
+        /* Task Section */
+        .task-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--accent-color);
+        }
+        .task-item:last-child {
+            border-bottom: none;
+        }
+        .task-info {
+            flex-grow: 1;
+        }
+        .task-reward {
+            font-size: 0.9em;
+            color: var(--highlight-color);
+        }
+
+        /* Profile Section */
+        #profile-section .card p {
+            margin: 8px 0;
+        }
+        #profile-section .card strong {
+            color: var(--highlight-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Profile Page -->
+        <div id="profile-page" class="page">
+            <h1>Profile</h1>
+            <div class="card">
+                <p><strong>Name:</strong> <span id="profile-name"></span></p>
+                <p><strong>Points:</strong> <span id="profile-points"></span></p>
+                <p><strong>Joined:</strong> <span id="profile-join-date"></span></p>
+                <p><strong>Referral Link:</strong> <span id="profile-referral"></span></p>
+            </div>
+            <button class="button" id="reset-data-button">Reset All Data</button>
+        </div>
+
+        <!-- Tap Page -->
+        <div id="tap-page" class="page active">
+            <div id="tap-section">
+                <div class="points-display">Points: <span id="tap-points-display">0</span></div>
+                <div id="cat-image" role="button" aria-label="Tap the cat">🐱</div>
+                <div class="energy-bar-container">
+                    <div id="energy-bar-fill">Energy: 100/100</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Task Page -->
+        <div id="task-page" class="page">
+            <h1>Tasks</h1>
+            <div id="task-list" class="card">
+                <!-- Tasks will be populated by JS -->
+            </div>
+        </div>
+
+        <!-- Withdraw Page -->
+        <div id="withdraw-page" class="page">
+            <h1>Withdraw Points</h1>
+            <div class="card">
+                <p>Your Points: <span id="withdraw-points-display">0</span></p>
+                <label for="withdraw-amount">Amount to Withdraw:</label>
+                <input type="number" id="withdraw-amount" placeholder="Enter amount">
+                
+                <label for="withdraw-method">Withdrawal Method:</label>
+                <select id="withdraw-method">
+                    <option value="paypal">PayPal</option>
+                    <option value="wire">Wire Transfer</option>
+                    <option value="crypto">Crypto (USDT)</option>
+                </select>
+                <button id="withdraw-button" class="button">Withdraw</button>
+                <p id="withdraw-message" style="margin-top:10px; text-align:center;"></p>
+            </div>
+        </div>
+    </div>
+
+    <nav class="bottom-nav">
+        <button class="nav-button" data-page="profile-page">
+            <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+            Profile
+        </button>
+        <button class="nav-button active" data-page="tap-page">
+             <svg viewBox="0 0 24 24"><path d="M20.56 11.3c.48-.5.43-1.2-.11-1.62l-3.37-2.53.01-3.62c0-.67-.41-1.27-1.04-1.5L12 0l-4.05 2.03c-.63.23-1.04.83-1.04 1.5l.01 3.62-3.37 2.53c-.54.42-.59 1.12-.11 1.62l2.72 2.85L4 18.69c-.33.73.03 1.59.79 1.88l3.17 1.19L12 24l4.05-2.23 3.17-1.19c.76-.29 1.12-1.15.79-1.88l-2.2-4.54 2.72-2.85zM10 14.5V10h4v4.5l-2 2-2-2zM7.13 9.21l2.2-1.65-.01-2.71L12 3.18l2.69 1.67-.01 2.71 2.2 1.65L13.96 11h-3.92L7.13 9.21z"/></svg>
+            Tap
+        </button>
+        <button class="nav-button" data-page="task-page">
+            <svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-5 3c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm-7 0h4v2H8V9zm0 3h4v2H8v-2z"/></svg>
+            Tasks
+        </button>
+        <button class="nav-button" data-page="withdraw-page">
+            <svg viewBox="0 0 24 24"><path d="M5 4v2h14V4H5zm0 10h4v6h6v-6h4l-7-7-7 7z"/></svg>
+            Withdraw
+        </button>
+    </nav>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Telegram WebApp SDK Setup ---
+            if (window.Telegram && window.Telegram.WebApp) {
+                Telegram.WebApp.ready();
+                Telegram.WebApp.expand(); // Make the web app full screen
+                // You can set theme parameters if your app design needs to match Telegram
+                // Telegram.WebApp.setHeaderColor('#16213e');
+                // Telegram.WebApp.setBackgroundColor('#1a1a2e');
+            }
+            
+            // --- State Variables ---
+            const MAX_ENERGY = 1000;
+            const ENERGY_REGEN_RATE = 2; // Energy points per second
+            const ENERGY_PER_TAP = 5;
+            const TAP_REWARD = 1;
+
+            let userData = {
+                points: 0,
+                energy: MAX_ENERGY,
+                lastEnergyUpdate: Date.now(),
+                userName: "Player",
+                joinDate: new Date().toLocaleDateString(),
+                referralLink: "t.me/your_tap_bot?start=REF123XYZ",
+                completedTasks: []
+            };
+
+            const tasks = [
+                { id: 'task1', name: 'Watch Tutorial Video', reward: 100, description: 'Learn how to play TapSwap.' },
+                { id: 'task2', name: 'Join Telegram Channel', reward: 150, description: 'Get updates and news.' },
+                { id: 'task3', name: 'Follow on X (Twitter)', reward: 120, description: 'Stay connected with our community.' },
+                { id: 'task4', name: 'Invite 3 Friends', reward: 500, description: 'Grow the community and earn big! (Simulation)' }
+            ];
+
+            // --- DOM Elements ---
+            const pages = document.querySelectorAll('.page');
+            const navButtons = document.querySelectorAll('.nav-button');
+            
+            const profileNameEl = document.getElementById('profile-name');
+            const profilePointsEl = document.getElementById('profile-points');
+            const profileJoinDateEl = document.getElementById('profile-join-date');
+            const profileReferralEl = document.getElementById('profile-referral');
+            const resetDataButton = document.getElementById('reset-data-button');
+
+            const tapPointsDisplayEl = document.getElementById('tap-points-display');
+            const catImageEl = document.getElementById('cat-image');
+            const energyBarFillEl = document.getElementById('energy-bar-fill');
+            const tapSectionEl = document.getElementById('tap-section');
+
+            const taskListEl = document.getElementById('task-list');
+
+            const withdrawPointsDisplayEl = document.getElementById('withdraw-points-display');
+            const withdrawAmountInput = document.getElementById('withdraw-amount');
+            const withdrawMethodSelect = document.getElementById('withdraw-method');
+            const withdrawButton = document.getElementById('withdraw-button');
+            const withdrawMessageEl = document.getElementById('withdraw-message');
+
+            // --- LocalStorage Functions ---
+            function saveData() {
+                userData.lastEnergyUpdate = Date.now(); // Always save current time for energy regen
+                localStorage.setItem('tapSwapData', JSON.stringify(userData));
+            }
+
+            function loadData() {
+                const savedData = localStorage.getItem('tapSwapData');
+                if (savedData) {
+                    const parsedData = JSON.parse(savedData);
+                    // Merge carefully to keep defaults for new properties
+                    userData = { ...userData, ...parsedData };
+                    
+                    // If Telegram SDK is available, try to get user info
+                    if (window.Telegram && Telegram.WebApp && Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user) {
+                        const tgUser = Telegram.WebApp.initDataUnsafe.user;
+                        userData.userName = tgUser.first_name + (tgUser.last_name ? ' ' + tgUser.last_name : '');
+                        // Note: joinDate should ideally be set only once.
+                        // If joinDate is in old format or not set, initialize it.
+                        if (!parsedData.joinDate || typeof parsedData.joinDate !== 'string' || !parsedData.joinDate.includes('/')) {
+                           userData.joinDate = new Date().toLocaleDateString();
+                        }
+                    } else {
+                         // If userName was previously saved as "Player" and now we have a real one, update
+                        if (parsedData.userName === "Player" && userData.userName !== "Player") {
+                            // Username already updated from TG SDK
+                        } else if (parsedData.userName) { // else use saved username
+                            userData.userName = parsedData.userName;
+                        }
+                    }
+
+
+                } else {
+                    // First time user, try to get TG username if available
+                     if (window.Telegram && Telegram.WebApp && Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user) {
+                        const tgUser = Telegram.WebApp.initDataUnsafe.user;
+                        userData.userName = tgUser.first_name + (tgUser.last_name ? ' ' + tgUser.last_name : '');
+                    }
+                    userData.joinDate = new Date().toLocaleDateString(); // Set join date on first load
+                    saveData(); // Save initial state
+                }
+                // Ensure energy is not more than max after loading (e.g. if MAX_ENERGY changed)
+                userData.energy = Math.min(userData.energy, MAX_ENERGY); 
+                regenerateEnergy(); // Calculate offline energy regeneration
+            }
+
+            // --- Navigation ---
+            function showPage(pageId) {
+                pages.forEach(page => {
+                    page.classList.toggle('active', page.id === pageId);
+                });
+                navButtons.forEach(button => {
+                    button.classList.toggle('active', button.dataset.page === pageId);
+                });
+                // Update displays when page becomes active
+                if (pageId === 'profile-page') updateProfileDisplay();
+                if (pageId === 'withdraw-page') updateWithdrawDisplay();
+                if (pageId === 'task-page') renderTasks(); // Re-render tasks in case state changed
+            }
+
+            navButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    showPage(button.dataset.page);
+                });
+            });
+
+            // --- Update UI Functions ---
+            function updatePointsDisplay() {
+                tapPointsDisplayEl.textContent = userData.points;
+                profilePointsEl.textContent = userData.points;
+                withdrawPointsDisplayEl.textContent = userData.points;
+            }
+
+            function updateEnergyBar() {
+                const percentage = (userData.energy / MAX_ENERGY) * 100;
+                energyBarFillEl.style.width = `${percentage}%`;
+                energyBarFillEl.textContent = `Energy: ${Math.floor(userData.energy)}/${MAX_ENERGY}`;
+            }
+            
+            function showFloatingText(text, x, y) {
+                const floatingText = document.createElement('div');
+                floatingText.classList.add('floating-text');
+                floatingText.textContent = text;
+                
+                // Adjust position to be relative to the tap section for better centering
+                const rect = catImageEl.getBoundingClientRect();
+                const containerRect = tapSectionEl.getBoundingClientRect();
+
+                floatingText.style.left = `${x - containerRect.left}px`;
+                floatingText.style.top = `${y - containerRect.top - 30}px`; // Start slightly above click
+                
+                tapSectionEl.appendChild(floatingText);
+
+                setTimeout(() => {
+                    floatingText.remove();
+                }, 950); // Remove slightly before animation ends
+            }
+
+
+            function updateProfileDisplay() {
+                profileNameEl.textContent = userData.userName;
+                profilePointsEl.textContent = userData.points;
+                profileJoinDateEl.textContent = userData.joinDate;
+                profileReferralEl.textContent = userData.referralLink;
+            }
+            
+            function updateWithdrawDisplay() {
+                withdrawPointsDisplayEl.textContent = userData.points;
+                withdrawAmountInput.value = '';
+                withdrawMessageEl.textContent = '';
+            }
+
+            // --- Tap Logic ---
+            catImageEl.addEventListener('click', (event) => {
+                if (userData.energy >= ENERGY_PER_TAP) {
+                    userData.points += TAP_REWARD;
+                    userData.energy -= ENERGY_PER_TAP;
+                    
+                    updatePointsDisplay();
+                    updateEnergyBar();
+                    saveData();
+
+                    // Show floating +1 text
+                    const rect = catImageEl.getBoundingClientRect();
+                    const clickX = event.clientX || (event.touches && event.touches[0].clientX);
+                    const clickY = event.clientY || (event.touches && event.touches[0].clientY);
+                    showFloatingText(`+${TAP_REWARD}`, clickX, clickY);
+
+                    // Haptic feedback if available
+                    if (Telegram.WebApp && Telegram.WebApp.HapticFeedback) {
+                        Telegram.WebApp.HapticFeedback.impactOccurred('light');
+                    }
+
+                } else {
+                    // Optionally, provide feedback that there's not enough energy
+                    if (Telegram.WebApp && Telegram.WebApp.HapticFeedback) {
+                        Telegram.WebApp.HapticFeedback.notificationOccurred('error');
+                    }
+                    // console.log("Not enough energy!");
+                }
+            });
+            
+            // --- Energy Regeneration ---
+            function regenerateEnergy() {
+                const now = Date.now();
+                const timeDiffSeconds = (now - userData.lastEnergyUpdate) / 1000;
+                const energyToRegen = timeDiffSeconds * ENERGY_REGEN_RATE;
+                
+                userData.energy = Math.min(MAX_ENERGY, userData.energy + energyToRegen);
+                userData.lastEnergyUpdate = now; // Update last check time
+                
+                updateEnergyBar();
+                // No need to saveData() here as it's called by the interval or on actions
+            }
+
+            setInterval(() => {
+                if (userData.energy < MAX_ENERGY) {
+                    userData.energy = Math.min(MAX_ENERGY, userData.energy + (ENERGY_REGEN_RATE / 2)); // Regen twice per second for smoother updates
+                    updateEnergyBar();
+                    saveData(); // Save energy progress
+                }
+            }, 500); // Run twice per second
+
+
+            // --- Task Logic ---
+            function renderTasks() {
+                taskListEl.innerHTML = ''; // Clear existing tasks
+                tasks.forEach(task => {
+                    const taskItem = document.createElement('div');
+                    taskItem.classList.add('task-item');
+
+                    const taskInfo = document.createElement('div');
+                    taskInfo.classList.add('task-info');
+                    taskInfo.innerHTML = `
+                        <strong>${task.name}</strong>
+                        <div class="task-reward">Reward: ${task.reward} points</div>
+                        <small>${task.description}</small>
+                    `;
+
+                    const taskButton = document.createElement('button');
+                    taskButton.classList.add('button');
+                    taskButton.style.padding = '8px 12px';
+                    taskButton.style.fontSize = '14px';
+                    taskButton.style.width = 'auto';
+                    taskButton.style.minWidth = '100px';
+
+
+                    if (userData.completedTasks.includes(task.id)) {
+                        taskButton.textContent = 'Completed';
+                        taskButton.disabled = true;
+                    } else {
+                        taskButton.textContent = 'Complete';
+                        taskButton.onclick = () => completeTask(task.id, task.reward);
+                    }
+                    
+                    taskItem.appendChild(taskInfo);
+                    taskItem.appendChild(taskButton);
+                    taskListEl.appendChild(taskItem);
+                });
+            }
+
+            function completeTask(taskId, reward) {
+                if (!userData.completedTasks.includes(taskId)) {
+                    userData.points += reward;
+                    userData.completedTasks.push(taskId);
+                    updatePointsDisplay();
+                    renderTasks(); // Re-render to update button state
+                    saveData();
+                    if (Telegram.WebApp && Telegram.WebApp.HapticFeedback) {
+                        Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                    }
+                    alert(`Task completed! You earned ${reward} points.`);
+                }
+            }
+
+            // --- Withdraw Logic ---
+            withdrawButton.addEventListener('click', () => {
+                const amount = parseInt(withdrawAmountInput.value);
+                const method = withdrawMethodSelect.value;
+
+                withdrawMessageEl.textContent = ''; // Clear previous messages
+
+                if (isNaN(amount) || amount <= 0) {
+                    withdrawMessageEl.textContent = 'Please enter a valid amount.';
+                    withdrawMessageEl.style.color = 'var(--text-color)';
+                    return;
+                }
+                if (amount > userData.points) {
+                    withdrawMessageEl.textContent = 'Insufficient points.';
+                    withdrawMessageEl.style.color = 'var(--text-color)';
+                    return;
+                }
+
+                // Simulate withdrawal
+                userData.points -= amount;
+                updatePointsDisplay();
+                saveData();
+                
+                withdrawMessageEl.textContent = `Withdrawal of ${amount} points via ${method} to localhost has been processed.`;
+                withdrawMessageEl.style.color = 'var(--energy-bar-fill)'; // Success color
+                withdrawAmountInput.value = ''; // Clear input
+
+                if (Telegram.WebApp && Telegram.WebApp.HapticFeedback) {
+                    Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                }
+                 console.log(`Withdrawal: ${amount} points via ${method} (simulated to localhost)`);
+            });
+
+            // --- Reset Data (for testing) ---
+            resetDataButton.addEventListener('click', () => {
+                if (confirm("Are you sure you want to reset all your data? This cannot be undone.")) {
+                    localStorage.removeItem('tapSwapData');
+                    // Re-initialize userData to defaults
+                    userData = {
+                        points: 0,
+                        energy: MAX_ENERGY,
+                        lastEnergyUpdate: Date.now(),
+                        userName: (window.Telegram && Telegram.WebApp && Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user) ? 
+                                  (Telegram.WebApp.initDataUnsafe.user.first_name + (Telegram.WebApp.initDataUnsafe.user.last_name ? ' ' + Telegram.WebApp.initDataUnsafe.user.last_name : '')) : 
+                                  "Player",
+                        joinDate: new Date().toLocaleDateString(),
+                        referralLink: "t.me/your_tap_bot?start=REF123XYZ",
+                        completedTasks: []
+                    };
+                    saveData(); // Save the fresh state
+                    // Update all displays
+                    updatePointsDisplay();
+                    updateEnergyBar();
+                    updateProfileDisplay();
+                    renderTasks();
+                    updateWithdrawDisplay();
+                    alert("Data has been reset.");
+                }
+            });
+
+
+            // --- Initial Setup ---
+            loadData(); // Load saved data or set defaults
+            updatePointsDisplay();
+            updateEnergyBar(); // Initial energy bar update after loading and offline regen
+            updateProfileDisplay(); // For profile page
+            renderTasks(); // For task page
+            updateWithdrawDisplay(); // For withdraw page
+            showPage('tap-page'); // Show tap page by default
+        });
+    </script>
+</body>
+</html>
